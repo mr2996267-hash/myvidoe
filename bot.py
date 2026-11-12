@@ -63,9 +63,9 @@ async def main():
     print("Telegram Bot is running...")
     
     # FastAPI এবং Bot একসাথে রান করার জন্য একটি লুপ তৈরি করা হচ্ছে
-    import uvicorn
-    
-    async def run_bot():
+import uvicorn
+
+async def run_bot():
     await application.initialize()
     await application.start()
     await application.updater.start_polling()
