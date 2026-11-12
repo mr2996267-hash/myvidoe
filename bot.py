@@ -13,11 +13,13 @@ APP_URL = "https://your-render-app-url.onrender.com"  # Render থেকে Publ
 
 app = FastAPI()
 
-# Static files এর জন্য ফোল্ডার মাপিং (যাতে index.html রেন্ডার করতে পারে)
+# ✅ FIX: static ফোল্ডার না থাকলে স্বয়ংক্রিয়ভাবে তৈরি হবে
+os.makedirs("static", exist_ok=True)
+
+# Static files এর জন্য ফোল্ডার মাউন্ট (যাতে index.html রেন্ডার করতে পারে)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # --- Telegram Bot Functions ---
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Link দিন")
 
