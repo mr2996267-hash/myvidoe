@@ -8,7 +8,10 @@ from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, Messa
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 
 # --- Configuration ---
-BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"  # এখানে আপনার Bot Token দিন
+# Render-এর Environment Variable থেকে টোকেন নেবে, না পেলে এরর দেবে
+BOT_TOKEN = os.getenv("BOT_TOKEN") 
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN Environment Variable-এ সেট করা নেই!")
 APP_URL = "https://your-render-app-url.onrender.com"  # Render থেকে Public URL পASTE করুন
 
 app = FastAPI()
