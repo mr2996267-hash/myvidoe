@@ -1,5 +1,0 @@
-mkdir static
-touch static/.gitkeep
-git add static/.gitkeep
-git commit -m "add static folder"
-git push
