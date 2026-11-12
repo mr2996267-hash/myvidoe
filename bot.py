@@ -66,15 +66,29 @@ async def main():
     import uvicorn
     
     async def run_bot():
-        await application.initialize()
-        await application.start()
-        await application.updater.start_polling()
-        await application.idle()
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    # await application.idle()  <-- এটি বাদ দিতে হবে, কারণ নতুন ভার্সনে নেই
+    
+    # বট যাতে বন্ধ না হয়ে যায়, তাই একটি Event-এর মাধ্যমে অপেক্ষা করানো হচ্ছে
+    stop_event = asyncio.Event()
+    try:
+        await stop_event.wait()
+    except (KeyboardInterrupt, SystemExit):
+        pass
+    finally:
+        await application.updater.stop()
+        await application.stop()
+        await application.shutdown()
 
+async def main():
     # দুটি প্রসেস একসাথে রান করা (Bot এবং Web Server)
     bot_task = asyncio.create_task(run_bot())
     
-    config = uvicorn.Config(app, host="0.0.0.0", port=8000)
+    # Render-এর পোর্ট নেওয়া হচ্ছে (ডিফল্ট 8000)
+    port = int(os.environ.get("PORT", 8000))
+    config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")
     server = uvicorn.Server(config)
     
     web_task = asyncio.create_task(server.serve())
